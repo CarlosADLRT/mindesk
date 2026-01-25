@@ -1,0 +1,304 @@
+/**
+ * Session Sheet Component
+ * Bottom sheet for creating/editing appointments
+ */
+
+'use client'
+
+import { useState, useEffect, FormEvent } from 'react'
+import { X } from 'lucide-react'
+import dayjs from 'dayjs'
+import { getClients } from '@/lib/api/clients'
+import type { Client } from '@/lib/supabase'
+
+interface SessionSheetProps {
+  mode: 'create' | 'edit'
+  event?: any
+  prefilledData?: { start: Date; end: Date }
+  workspaceId: string
+  onClose: () => void
+  onSave: (data: any) => Promise<void>
+  onDelete?: () => Promise<void>
+}
+
+export function SessionSheet({
+  mode,
+  event,
+  prefilledData,
+  workspaceId,
+  onClose,
+  onSave,
+  onDelete,
+}: SessionSheetProps) {
+  const [clients, setClients] = useState<Client[]>([])
+  const [loading, setLoading] = useState(false)
+  const [formData, setFormData] = useState({
+    client_id: event?.extendedProps?.clientId || '',
+    start_time: '',
+    end_time: '',
+    title: event?.extendedProps?.title || 'Sesión Individual',
+    location: event?.extendedProps?.location || 'Consultorio',
+    description: event?.extendedProps?.description || '',
+    status: event?.extendedProps?.status || 'scheduled',
+  })
+
+  useEffect(() => {
+    loadClients()
+
+    // Set initial times
+    if (prefilledData) {
+      setFormData((prev) => ({
+        ...prev,
+        start_time: dayjs(prefilledData.start).format('YYYY-MM-DDTHH:mm'),
+        end_time: dayjs(prefilledData.end).format('YYYY-MM-DDTHH:mm'),
+      }))
+    } else if (event) {
+      setFormData((prev) => ({
+        ...prev,
+        start_time: dayjs(event.start).format('YYYY-MM-DDTHH:mm'),
+        end_time: dayjs(event.end).format('YYYY-MM-DDTHH:mm'),
+      }))
+    }
+  }, [])
+
+  const loadClients = async () => {
+    try {
+      const fetchedClients = await getClients(workspaceId)
+      setClients(fetchedClients)
+    } catch (error) {
+      console.error('Error loading clients:', error)
+    }
+  }
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      await onSave(formData)
+    } catch (error) {
+      console.error('Error saving:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!onDelete) return
+    if (!confirm('¿Estás seguro de que deseas cancelar esta sesión?')) return
+
+    setLoading(true)
+    try {
+      await onDelete()
+    } catch (error) {
+      console.error('Error deleting:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Sheet */}
+      <div className="relative w-full bg-white rounded-t-3xl shadow-2xl animate-slide-up max-h-[90vh] overflow-y-auto">
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-2">
+          <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
+        </div>
+
+        {/* Content */}
+        <form onSubmit={handleSubmit} className="px-6 pb-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">
+              {mode === 'create' ? 'Nueva Sesión' : 'Editar Sesión'}
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Form fields */}
+          <div className="space-y-4">
+            {/* Client selector */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Cliente <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.client_id}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, client_id: e.target.value }))
+                }
+                required
+                className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-base focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+              >
+                <option value="">Seleccionar cliente...</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.first_name} {client.last_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Date/Time */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Inicio
+                </label>
+                <input
+                  type="datetime-local"
+                  value={formData.start_time}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, start_time: e.target.value }))
+                  }
+                  required
+                  className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-base focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Fin
+                </label>
+                <input
+                  type="datetime-local"
+                  value={formData.end_time}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, end_time: e.target.value }))
+                  }
+                  required
+                  className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-base focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Type & Location */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Tipo
+                </label>
+                <select
+                  value={formData.title}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, title: e.target.value }))
+                  }
+                  className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-base focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                >
+                  <option>Sesión Individual</option>
+                  <option>Sesión de Pareja</option>
+                  <option>Sesión Familiar</option>
+                  <option>Evaluación Inicial</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Ubicación
+                </label>
+                <select
+                  value={formData.location}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, location: e.target.value }))
+                  }
+                  className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-base focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                >
+                  <option>Consultorio</option>
+                  <option>Virtual</option>
+                  <option>Domicilio</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Status (only in edit mode) */}
+            {mode === 'edit' && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Estado
+                </label>
+                <div className="flex gap-2">
+                  {['scheduled', 'completed', 'canceled', 'no_show'].map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() =>
+                        setFormData((prev) => ({ ...prev, status }))
+                      }
+                      className={`px-4 py-2 rounded-lg font-semibold text-sm ${
+                        formData.status === status
+                          ? 'bg-primary text-white'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {status === 'scheduled' && 'Programada'}
+                      {status === 'completed' && 'Realizada'}
+                      {status === 'canceled' && 'Cancelada'}
+                      {status === 'no_show' && 'No asistió'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Notes */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Descripción
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, description: e.target.value }))
+                }
+                rows={3}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-base focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none"
+                placeholder="Notas adicionales..."
+              />
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 mt-6">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-6 py-4 bg-gray-100 text-gray-700 rounded-xl font-semibold text-base hover:bg-gray-200 active:scale-95 transition-all"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-6 py-4 bg-primary text-white rounded-xl font-semibold text-base hover:bg-primaryDark active:scale-95 transition-all shadow-lg disabled:opacity-50"
+            >
+              {loading ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+
+          {/* Delete button (if editing) */}
+          {mode === 'edit' && onDelete && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={loading}
+              className="w-full px-6 py-3 mt-3 text-red-600 font-semibold text-base hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50"
+            >
+              Cancelar Sesión
+            </button>
+          )}
+        </form>
+      </div>
+    </div>
+  )
+}
