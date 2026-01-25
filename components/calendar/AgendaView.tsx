@@ -12,7 +12,7 @@ import { useCalendarData } from '@/hooks/useCalendarData'
 import { useSessionMutations } from '@/hooks/useSessionMutations'
 import { useAuth } from '@/contexts/AuthContext'
 import { SessionSheet } from './SessionSheet'
-import type { Tables } from '@/lib/database.types'
+import type { Tables } from '@/lib/supabase'
 
 type Appointment = Tables<'appointments'> & {
   client: {
