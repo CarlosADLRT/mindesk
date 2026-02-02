@@ -8,10 +8,10 @@ import {
   Video,
   Phone,
   MessageCircle,
-  MoreVertical,
   CalendarPlus
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { AppointmentActionMenu } from './calendar/AppointmentActionMenu'
 import dayjs from 'dayjs'
 import 'dayjs/locale/es'
 
@@ -22,13 +22,23 @@ interface DashboardProps {
   todaysSessions: (Session & { location?: string; title?: string })[]
   onNewClient?: () => void
   onNewSession?: () => void
+  onComplete?: (sessionId: string) => void
+  onNoShow?: (sessionId: string) => void
+  onReschedule?: (session: Session & { location?: string; title?: string }) => void
+  onCancel?: (sessionId: string, patientName: string) => void
+  actionLoading?: string | null
 }
 
 export const DashboardView: React.FC<DashboardProps> = ({
   sessions,
   todaysSessions,
   onNewClient,
-  onNewSession
+  onNewSession,
+  onComplete,
+  onNoShow,
+  onReschedule,
+  onCancel,
+  actionLoading,
 }) => {
   const { profile } = useAuth()
 
@@ -66,6 +76,21 @@ export const DashboardView: React.FC<DashboardProps> = ({
   const completedCount = todaysSessions.filter(s => s.status === SessionStatus.COMPLETED).length
   const totalCount = todaysSessions.length
   const completionPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+
+  // Map SessionStatus enum back to database status string
+  const getDbStatus = (status: SessionStatus): string => {
+    switch (status) {
+      case SessionStatus.COMPLETED:
+        return 'completed'
+      case SessionStatus.CANCELLED:
+        return 'canceled'
+      case SessionStatus.NO_SHOW:
+        return 'no_show'
+      case SessionStatus.SCHEDULED:
+      default:
+        return 'scheduled'
+    }
+  }
 
   // Get session status badge info
   const getSessionStatusInfo = (session: Session) => {
@@ -281,9 +306,15 @@ export const DashboardView: React.FC<DashboardProps> = ({
                       </div>
 
                       {/* Options Menu */}
-                      <button className="p-2 text-gray-400 hover:text-gray-600">
-                        <MoreVertical className="w-5 h-5" />
-                      </button>
+                      <AppointmentActionMenu
+                        appointmentId={session.id}
+                        status={getDbStatus(session.status)}
+                        onComplete={() => onComplete?.(session.id)}
+                        onNoShow={() => onNoShow?.(session.id)}
+                        onReschedule={() => onReschedule?.(session)}
+                        onCancel={() => onCancel?.(session.id, session.patientName)}
+                        isLoading={actionLoading === session.id}
+                      />
                     </div>
                     {index < todaysSessions.length - 1 && (
                       <div className="border-t border-gray-200"></div>

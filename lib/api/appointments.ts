@@ -212,7 +212,10 @@ export async function completeAppointment(appointmentId: string) {
   const { data, error } = await supabase
     .from('appointments')
     // @ts-ignore - Supabase generated types issue with update
-    .update({ status: 'completed' })
+    .update({
+      status: 'completed',
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', appointmentId)
     .select()
     .single()
@@ -222,6 +225,106 @@ export async function completeAppointment(appointmentId: string) {
   }
 
   return data
+}
+
+/**
+ * Mark appointment as no-show
+ */
+export async function markAsNoShow(appointmentId: string) {
+  const { data, error } = await supabase
+    .from('appointments')
+    // @ts-ignore - Supabase generated types issue with update
+    .update({
+      status: 'no_show',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', appointmentId)
+    .select()
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+/**
+ * Reschedule appointment (cancel old + create new)
+ */
+export async function rescheduleAppointment(
+  appointmentId: string,
+  newStartTime: Date,
+  newEndTime: Date
+) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error('User not authenticated')
+  }
+
+  // Get original appointment data
+  // @ts-ignore - Supabase generated types issue with select
+  const { data: original, error: fetchError } = await supabase
+    .from('appointments')
+    .select('*')
+    .eq('id', appointmentId)
+    .single()
+
+  if (fetchError || !original) {
+    throw fetchError || new Error('Appointment not found')
+  }
+
+  // Cancel the original appointment
+  const { error: cancelError } = await supabase
+    .from('appointments')
+    // @ts-ignore - Supabase generated types issue with update
+    .update({
+      status: 'canceled',
+      canceled_at: new Date().toISOString(),
+      canceled_by: user.id,
+      cancellation_reason: 'Reagendada',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', appointmentId)
+
+  if (cancelError) {
+    throw cancelError
+  }
+
+  // Cast original to any to avoid type issues with Supabase generated types
+  const orig = original as any
+  const appointmentData = {
+    workspace_id: orig.workspace_id,
+    client_id: orig.client_id,
+    provider_id: orig.provider_id,
+    start_time: newStartTime.toISOString(),
+    end_time: newEndTime.toISOString(),
+    timezone: orig.timezone,
+    title: orig.title,
+    description: orig.description,
+    location: orig.location,
+    package_purchase_id: orig.package_purchase_id,
+    is_billable: orig.is_billable,
+    status: 'scheduled' as const,
+    created_by: user.id,
+  }
+
+  // Create new appointment with the new times
+  const { data: newAppointment, error: createError } = await supabase
+    .from('appointments')
+    // @ts-ignore - Supabase generated types issue with insert
+    .insert(appointmentData)
+    .select()
+    .single()
+
+  if (createError) {
+    throw createError
+  }
+
+  return newAppointment
 }
 
 /**
