@@ -5,6 +5,7 @@ import { DashboardView } from '@/components/DashboardView'
 import { getWorkspaces } from '@/lib/api/workspaces'
 import {
   getAppointmentsByDateRange,
+  getPendingAppointments,
   completeAppointment,
   markAsNoShow,
   cancelAppointment,
@@ -22,6 +23,7 @@ import dayjs from 'dayjs'
 export default function DashboardPage() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [todaysSessions, setTodaysSessions] = useState<(Session & { location?: string; title?: string })[]>([])
+  const [pendingSessions, setPendingSessions] = useState<(Session & { location?: string; title?: string })[]>([])
   const [loading, setLoading] = useState(true)
   const [workspaceId, setWorkspaceId] = useState<string>('')
   const [showClientModal, setShowClientModal] = useState(false)
@@ -66,12 +68,11 @@ export default function DashboardPage() {
 
   const fetchDashboardData = async () => {
     try {
-      setLoading(true)
-
       const workspaces = await getWorkspaces()
       if (!workspaces.length) {
         setSessions([])
         setTodaysSessions([])
+        setPendingSessions([])
         return
       }
 
@@ -136,6 +137,44 @@ export default function DashboardPage() {
       })
 
       setTodaysSessions(todaySessions)
+
+      // Fetch pending sessions (excluding today)
+      const pendingAppointments = await getPendingAppointments(wsId)
+      const mappedPending: (Session & { location?: string; title?: string })[] = pendingAppointments.map((apt: any) => {
+        const start = new Date(apt.start_time)
+        const end = new Date(apt.end_time)
+        const durationMinutes = Math.max(
+          30,
+          Math.round((end.getTime() - start.getTime()) / (1000 * 60))
+        )
+
+        const statusMap: Record<string, SessionStatus> = {
+          scheduled: SessionStatus.SCHEDULED,
+          completed: SessionStatus.COMPLETED,
+          canceled: SessionStatus.CANCELLED,
+          no_show: SessionStatus.NO_SHOW,
+        }
+
+        return {
+          id: apt.id,
+          patientId: apt.client_id,
+          patientName: apt.client
+            ? `${apt.client.first_name} ${apt.client.last_name}`
+            : 'Paciente',
+          date: apt.start_time,
+          durationMinutes,
+          status: statusMap[apt.status] ?? SessionStatus.SCHEDULED,
+          paymentStatus: apt.payment_status
+            ? (apt.payment_status.toLowerCase() === 'paid'
+                ? PaymentStatus.PAID
+                : PaymentStatus.PENDING)
+            : PaymentStatus.PENDING,
+          price: apt.amount ?? 0,
+          location: apt.location,
+          title: apt.title,
+        }
+      })
+      setPendingSessions(mappedPending)
     } catch (error) {
       console.error('Error loading dashboard data:', error)
     } finally {
@@ -227,6 +266,7 @@ export default function DashboardPage() {
       <DashboardView
         sessions={sessions}
         todaysSessions={todaysSessions}
+        pendingSessions={pendingSessions}
         onNewClient={() => setShowClientModal(true)}
         onNewSession={() => setShowSessionSheet(true)}
         onComplete={handleComplete}

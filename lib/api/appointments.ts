@@ -328,6 +328,39 @@ export async function rescheduleAppointment(
 }
 
 /**
+ * Get pending appointments (scheduled or no_show) excluding today
+ */
+export async function getPendingAppointments(workspaceId: string) {
+  const today = new Date()
+  const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString()
+  const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString()
+
+  const { data, error } = await supabase
+    .from('appointments')
+    .select(`
+      *,
+      client:clients (
+        id,
+        first_name,
+        last_name,
+        phone,
+        email
+      )
+    `)
+    .eq('workspace_id', workspaceId)
+    .in('status', ['scheduled'])
+    .is('deleted_at', null)
+    .or(`start_time.lt.${startOfDay},start_time.gte.${endOfDay}`)
+    .order('start_time', { ascending: true })
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+/**
  * Check if a time slot is available for a provider
  */
 export async function checkTimeSlotAvailability(

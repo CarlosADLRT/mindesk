@@ -8,7 +8,9 @@ import {
   Video,
   Phone,
   MessageCircle,
-  CalendarPlus
+  CalendarPlus,
+  AlertCircle,
+  Clock
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { AppointmentActionMenu } from './calendar/AppointmentActionMenu'
@@ -20,6 +22,7 @@ dayjs.locale('es')
 interface DashboardProps {
   sessions: (Session & { location?: string; title?: string })[]
   todaysSessions: (Session & { location?: string; title?: string })[]
+  pendingSessions?: (Session & { location?: string; title?: string })[]
   onNewClient?: () => void
   onNewSession?: () => void
   onComplete?: (sessionId: string) => void
@@ -32,6 +35,7 @@ interface DashboardProps {
 export const DashboardView: React.FC<DashboardProps> = ({
   sessions,
   todaysSessions,
+  pendingSessions = [],
   onNewClient,
   onNewSession,
   onComplete,
@@ -325,6 +329,106 @@ export const DashboardView: React.FC<DashboardProps> = ({
               <div className="text-center py-4 text-gray-400 text-sm">
                 Fin de la agenda para hoy
               </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Pending Sessions Section */}
+      <div className="bg-white rounded-2xl shadow-sm p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <Clock className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">
+                Sesiones pendientes
+                {pendingSessions.length > 0 && (
+                  <span className="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
+                    {pendingSessions.length}
+                  </span>
+                )}
+              </h2>
+              <p className="text-xs text-gray-600">
+                Sesiones pasadas y futuras que requieren atención
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-0">
+          {pendingSessions.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <AlertCircle className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+              <p>No hay sesiones pendientes</p>
+            </div>
+          ) : (
+            <>
+              {pendingSessions.map((session, index) => {
+                const sessionType = getSessionType(session)
+                const sessionDate = new Date(session.date)
+                const isPast = sessionDate < new Date()
+                const isNoShow = session.status === SessionStatus.NO_SHOW
+
+                return (
+                  <div key={session.id}>
+                    <div className="flex items-center gap-4 py-4 hover:bg-gray-50 transition-colors">
+                      {/* Date & Time */}
+                      <div className="w-24 flex-shrink-0">
+                        <span className="block text-xs font-medium text-gray-500">
+                          {dayjs(sessionDate).format('DD MMM')}
+                        </span>
+                        <span className="text-sm font-medium text-gray-700">
+                          {dayjs(sessionDate).format('h:mm A')}
+                        </span>
+                      </div>
+
+                      {/* Status Bar */}
+                      <div className={`w-1 h-12 rounded-full ${isNoShow ? 'bg-orange-400' : isPast ? 'bg-yellow-400' : 'bg-gray-400'}`}></div>
+
+                      {/* Session Info */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-gray-900 mb-1">
+                          {session.patientName}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {sessionType.type} • {sessionType.location}
+                        </p>
+                      </div>
+
+                      {/* Status Badge */}
+                      {isNoShow ? (
+                        <div className="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
+                          NO ASISTIÓ
+                        </div>
+                      ) : isPast ? (
+                        <div className="px-3 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700">
+                          PASADA
+                        </div>
+                      ) : (
+                        <div className="px-3 py-1 rounded-full text-xs font-bold bg-gray-200 text-gray-700">
+                          PROGRAMADA
+                        </div>
+                      )}
+
+                      {/* Options Menu */}
+                      <AppointmentActionMenu
+                        appointmentId={session.id}
+                        status={getDbStatus(session.status)}
+                        onComplete={() => onComplete?.(session.id)}
+                        onNoShow={() => onNoShow?.(session.id)}
+                        onReschedule={() => onReschedule?.(session)}
+                        onCancel={() => onCancel?.(session.id, session.patientName)}
+                        isLoading={actionLoading === session.id}
+                      />
+                    </div>
+                    {index < pendingSessions.length - 1 && (
+                      <div className="border-t border-gray-200"></div>
+                    )}
+                  </div>
+                )
+              })}
             </>
           )}
         </div>
