@@ -217,7 +217,10 @@ export async function completeAppointment(appointmentId: string) {
   const { data, error } = await supabase
     .from('appointments')
     // @ts-ignore - Supabase generated types issue with update
-    .update({ status: 'completed' })
+    .update({
+      status: 'completed',
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', appointmentId)
     .select()
     .single()
@@ -230,15 +233,34 @@ export async function completeAppointment(appointmentId: string) {
 }
 
 /**
- * Update appointment status with validation
- * Enforces transition rules and security at DB level
+ * Mark appointment as no-show
  */
-export async function updateAppointmentStatus(
-  appointmentId: string,
-  newStatus: 'scheduled' | 'completed' | 'canceled' | 'no_show',
-  metadata?: {
-    cancellationReason?: string
+export async function markAsNoShow(appointmentId: string) {
+  const { data, error } = await supabase
+    .from('appointments')
+    // @ts-ignore - Supabase generated types issue with update
+    .update({
+      status: 'no_show',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', appointmentId)
+    .select()
+    .single()
+
+  if (error) {
+    throw error
   }
+
+  return data
+}
+
+/**
+ * Reschedule appointment (cancel old + create new)
+ */
+export async function rescheduleAppointment(
+  appointmentId: string,
+  newStartTime: Date,
+  newEndTime: Date
 ) {
   const {
     data: { user },
@@ -248,36 +270,91 @@ export async function updateAppointmentStatus(
     throw new Error('User not authenticated')
   }
 
-  const updates: any = {
-    status: newStatus,
-    updated_at: new Date().toISOString(),
+  // @ts-ignore - Supabase generated types issue with select
+  const { data: original, error: fetchError } = await supabase
+    .from('appointments')
+    .select('*')
+    .eq('id', appointmentId)
+    .single()
+
+  if (fetchError || !original) {
+    throw fetchError || new Error('Appointment not found')
   }
 
-  // Add metadata for canceled status
-  if (newStatus === 'canceled' && metadata?.cancellationReason) {
-    updates.canceled_at = new Date().toISOString()
-    updates.canceled_by = user.id
-    updates.cancellation_reason = metadata.cancellationReason
+  const { error: cancelError } = await supabase
+    .from('appointments')
+    // @ts-ignore - Supabase generated types issue with update
+    .update({
+      status: 'canceled',
+      canceled_at: new Date().toISOString(),
+      canceled_by: user.id,
+      cancellation_reason: 'Reagendada',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', appointmentId)
+
+  if (cancelError) {
+    throw cancelError
   }
+
+  const orig = original as any
+  const appointmentData = {
+    workspace_id: orig.workspace_id,
+    client_id: orig.client_id,
+    provider_id: orig.provider_id,
+    start_time: newStartTime.toISOString(),
+    end_time: newEndTime.toISOString(),
+    timezone: orig.timezone,
+    title: orig.title,
+    description: orig.description,
+    location: orig.location,
+    package_purchase_id: orig.package_purchase_id,
+    is_billable: orig.is_billable,
+    status: 'scheduled' as const,
+    created_by: user.id,
+  }
+
+  const { data: newAppointment, error: createError } = await supabase
+    .from('appointments')
+    // @ts-ignore - Supabase generated types issue with insert
+    .insert(appointmentData)
+    .select()
+    .single()
+
+  if (createError) {
+    throw createError
+  }
+
+  return newAppointment
+}
+
+/**
+ * Get pending appointments (scheduled or no_show) excluding today
+ */
+export async function getPendingAppointments(workspaceId: string) {
+  const today = new Date()
+  const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString()
+  const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString()
 
   const { data, error } = await supabase
     .from('appointments')
-    // @ts-ignore - Supabase generated types issue with update
-    .update(updates)
-    .eq('id', appointmentId)
     .select(`
       *,
       client:clients (
         id,
         first_name,
         last_name,
-        phone
+        phone,
+        email
       )
     `)
-    .single()
+    .eq('workspace_id', workspaceId)
+    .in('status', ['scheduled'])
+    .is('deleted_at', null)
+    .or(`start_time.lt.${startOfDay},start_time.gte.${endOfDay}`)
+    .order('start_time', { ascending: true })
 
   if (error) {
-    // DB will throw error if transition is invalid or user lacks permission
     throw error
   }
 

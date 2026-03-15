@@ -19,6 +19,7 @@ interface SessionSheetProps {
   event?: any
   prefilledData?: { start: Date; end: Date }
   workspaceId: string
+  isReschedule?: boolean
   onClose: () => void
   onSave: (data: any) => Promise<void>
   onDelete?: () => Promise<void>
@@ -30,6 +31,7 @@ export function SessionSheet({
   event,
   prefilledData,
   workspaceId,
+  isReschedule = false,
   onClose,
   onSave,
   onDelete,
@@ -137,7 +139,11 @@ export function SessionSheet({
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">
-              {mode === 'create' ? 'Nueva Sesión' : 'Editar Sesión'}
+              {isReschedule
+                ? 'Reprogramar Sesión'
+                : mode === 'create'
+                ? 'Nueva Sesión'
+                : 'Editar Sesión'}
             </h2>
             <button
               type="button"
@@ -147,6 +153,15 @@ export function SessionSheet({
               <X className="w-6 h-6" />
             </button>
           </div>
+
+          {/* Reschedule notice */}
+          {isReschedule && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-700">
+                Selecciona la nueva fecha y hora para esta cita. La cita original será cancelada automáticamente.
+              </p>
+            </div>
+          )}
 
           {/* Form fields */}
           <div className="space-y-4">
@@ -283,7 +298,13 @@ export function SessionSheet({
               disabled={loading}
               className="flex-1 px-6 py-4 bg-primary text-white rounded-xl font-semibold text-base hover:bg-primaryDark active:scale-95 transition-all shadow-lg disabled:opacity-50"
             >
-              {loading ? 'Guardando...' : 'Guardar'}
+              {loading
+                ? isReschedule
+                  ? 'Reprogramando...'
+                  : 'Guardando...'
+                : isReschedule
+                ? 'Reprogramar'
+                : 'Guardar'}
             </button>
           </div>
 
