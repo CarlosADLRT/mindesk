@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import dayjs from 'dayjs'
-import { ChevronLeft, ChevronRight, Video, Building2, Coffee, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Video, Building2, Coffee, Plus, Phone, MapPin, CreditCard } from 'lucide-react'
 import { useCalendarData } from '@/hooks/useCalendarData'
 import { useSessionMutations } from '@/hooks/useSessionMutations'
 import { useAuth } from '@/contexts/AuthContext'
@@ -20,6 +20,11 @@ type Appointment = Tables<'appointments'> & {
     first_name: string
     last_name: string
     phone: string | null
+    email: string | null
+    date_of_birth: string | null
+    city: string | null
+    doc_type: string | null
+    doc_id: string | null
   } | null
 }
 
@@ -114,6 +119,37 @@ export function AgendaView({ workspaceId }: AgendaViewProps) {
     return location.toLowerCase().includes('virtual') || location.toLowerCase().includes('online')
   }
 
+  // Calculate age from date of birth
+  const getAge = (dateOfBirth: string | null) => {
+    if (!dateOfBirth) return null
+    const today = dayjs()
+    const birthDate = dayjs(dateOfBirth)
+    return today.diff(birthDate, 'year')
+  }
+
+  // Format document info for display
+  const getDocumentInfo = (apt: Appointment) => {
+    if (!apt.client?.doc_type || !apt.client?.doc_id) return null
+    return `${apt.client.doc_type} ${apt.client.doc_id}`
+  }
+
+  // Format contact info for display
+  const getContactInfo = (apt: Appointment) => {
+    const parts = []
+    if (apt.client?.phone) parts.push(apt.client.phone)
+    if (apt.client?.email) parts.push(apt.client.email)
+    return parts.length > 0 ? parts.join(' • ') : null
+  }
+
+  // Format client metadata (age, city)
+  const getClientMetadata = (apt: Appointment) => {
+    const parts = []
+    const age = getAge(apt.client?.date_of_birth || null)
+    if (age) parts.push(`${age} años`)
+    if (apt.client?.city) parts.push(apt.client.city)
+    return parts.length > 0 ? parts.join(' • ') : null
+  }
+
   // Get appointment position and height
   const getAppointmentStyle = (apt: Appointment) => {
     const start = dayjs(apt.start_time)
@@ -121,10 +157,13 @@ export function AgendaView({ workspaceId }: AgendaViewProps) {
     const startMinutes = start.hour() * 60 + start.minute()
     const endMinutes = end.hour() * 60 + end.minute()
     const duration = endMinutes - startMinutes
-    
+
     // Position from 8 AM (480 minutes)
     const top = ((startMinutes - 480) / 60) * 80 // 80px per hour
-    const height = (duration / 60) * 80
+    const calculatedHeight = (duration / 60) * 80
+
+    // Ensure minimum height of 120px to accommodate all information
+    const height = Math.max(calculatedHeight, 120)
 
     return {
       top: `${top}px`,
@@ -395,9 +434,41 @@ export function AgendaView({ workspaceId }: AgendaViewProps) {
                                       {statusInfo.label}
                                     </span>
                                   </div>
-                                  <p className="text-xs text-gray-600">
+                                  <p className="text-xs text-gray-600 mb-1">
                                     {virtual ? 'Virtual Session' : 'In-person Session'}
                                   </p>
+
+                                  {/* Document Information */}
+                                  {getDocumentInfo(apt) && (
+                                    <div className="flex items-center gap-1 text-xs text-gray-500 mt-1.5">
+                                      <CreditCard size={10} className="flex-shrink-0" />
+                                      <span className="truncate font-medium">{getDocumentInfo(apt)}</span>
+                                    </div>
+                                  )}
+
+                                  {/* Contact Information */}
+                                  {(apt.client?.phone || apt.client?.email) && (
+                                    <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5 agenda-contact">
+                                      <Phone size={10} className="flex-shrink-0" />
+                                      <span className="truncate">
+                                        {apt.client?.phone}
+                                        {apt.client?.email && apt.client?.phone && (
+                                          <span className="agenda-email-hide"> • {apt.client.email}</span>
+                                        )}
+                                        {apt.client?.email && !apt.client?.phone && (
+                                          <span>{apt.client.email}</span>
+                                        )}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {/* Age and City */}
+                                  {getClientMetadata(apt) && (
+                                    <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5 agenda-metadata">
+                                      <MapPin size={10} className="flex-shrink-0" />
+                                      <span className="truncate">{getClientMetadata(apt)}</span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>

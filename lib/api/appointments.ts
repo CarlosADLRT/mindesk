@@ -97,7 +97,12 @@ export async function getAppointmentsByDateRange(
         id,
         first_name,
         last_name,
-        phone
+        phone,
+        email,
+        date_of_birth,
+        city,
+        doc_type,
+        doc_id
       ),
       session_notes (
         id
@@ -218,6 +223,61 @@ export async function completeAppointment(appointmentId: string) {
     .single()
 
   if (error) {
+    throw error
+  }
+
+  return data
+}
+
+/**
+ * Update appointment status with validation
+ * Enforces transition rules and security at DB level
+ */
+export async function updateAppointmentStatus(
+  appointmentId: string,
+  newStatus: 'scheduled' | 'completed' | 'canceled' | 'no_show',
+  metadata?: {
+    cancellationReason?: string
+  }
+) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error('User not authenticated')
+  }
+
+  const updates: any = {
+    status: newStatus,
+    updated_at: new Date().toISOString(),
+  }
+
+  // Add metadata for canceled status
+  if (newStatus === 'canceled' && metadata?.cancellationReason) {
+    updates.canceled_at = new Date().toISOString()
+    updates.canceled_by = user.id
+    updates.cancellation_reason = metadata.cancellationReason
+  }
+
+  const { data, error } = await supabase
+    .from('appointments')
+    // @ts-ignore - Supabase generated types issue with update
+    .update(updates)
+    .eq('id', appointmentId)
+    .select(`
+      *,
+      client:clients (
+        id,
+        first_name,
+        last_name,
+        phone
+      )
+    `)
+    .single()
+
+  if (error) {
+    // DB will throw error if transition is invalid or user lacks permission
     throw error
   }
 

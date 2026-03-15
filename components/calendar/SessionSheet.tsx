@@ -9,7 +9,10 @@ import { useState, useEffect, FormEvent } from 'react'
 import { X } from 'lucide-react'
 import dayjs from 'dayjs'
 import { getClients } from '@/lib/api/clients'
+import { StatusControl } from './StatusControl'
+import { useAppointmentStatus } from '@/hooks/useAppointmentStatus'
 import type { Client } from '@/lib/supabase'
+import type { AppointmentStatus } from '@/lib/status-transitions'
 
 interface SessionSheetProps {
   mode: 'create' | 'edit'
@@ -19,6 +22,7 @@ interface SessionSheetProps {
   onClose: () => void
   onSave: (data: any) => Promise<void>
   onDelete?: () => Promise<void>
+  onStatusUpdate?: () => void // Callback to refresh calendar after status change
 }
 
 export function SessionSheet({
@@ -29,6 +33,7 @@ export function SessionSheet({
   onClose,
   onSave,
   onDelete,
+  onStatusUpdate,
 }: SessionSheetProps) {
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(false)
@@ -41,6 +46,21 @@ export function SessionSheet({
     description: event?.extendedProps?.description || '',
     status: event?.extendedProps?.status || 'scheduled',
   })
+
+  // Hook for status updates (only in edit mode)
+  const appointmentStatus = mode === 'edit' && event?.id
+    ? useAppointmentStatus({
+        appointmentId: event.id,
+        initialStatus: (event?.extendedProps?.status || 'scheduled') as AppointmentStatus,
+        onSuccess: () => {
+          // Refresh calendar after status change
+          onStatusUpdate?.()
+        },
+        onError: (error) => {
+          alert(`Error al actualizar estado: ${error.message}`)
+        },
+      })
+    : null
 
   useEffect(() => {
     loadClients()
@@ -221,34 +241,15 @@ export function SessionSheet({
               </div>
             </div>
 
-            {/* Status (only in edit mode) */}
-            {mode === 'edit' && (
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Estado
-                </label>
-                <div className="flex gap-2">
-                  {['scheduled', 'completed', 'canceled', 'no_show'].map((status) => (
-                    <button
-                      key={status}
-                      type="button"
-                      onClick={() =>
-                        setFormData((prev) => ({ ...prev, status }))
-                      }
-                      className={`px-4 py-2 rounded-lg font-semibold text-sm ${
-                        formData.status === status
-                          ? 'bg-primary text-white'
-                          : 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {status === 'scheduled' && 'Programada'}
-                      {status === 'completed' && 'Realizada'}
-                      {status === 'canceled' && 'Cancelada'}
-                      {status === 'no_show' && 'No asistió'}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            {/* Status Control (only in edit mode) */}
+            {mode === 'edit' && event?.id && appointmentStatus && (
+              <StatusControl
+                appointmentId={event.id}
+                currentStatus={appointmentStatus.currentStatus}
+                isUpdating={appointmentStatus.isUpdating}
+                disabled={loading}
+                onStatusChange={appointmentStatus.updateStatus}
+              />
             )}
 
             {/* Notes */}

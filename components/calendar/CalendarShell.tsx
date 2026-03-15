@@ -129,24 +129,32 @@ export function CalendarShell({ workspaceId }: CalendarShellProps) {
   }
 
   // Transform appointments to FullCalendar events
-  const calendarEvents = events.map((apt) => ({
-    id: apt.id,
-    title: apt.client
+  const calendarEvents = events.map((apt) => {
+    // Build client info display
+    const clientName = apt.client
       ? `${apt.client.first_name} ${apt.client.last_name}`
-      : 'Sin cliente',
-    start: apt.start_time,
-    end: apt.end_time,
-    backgroundColor: getStatusColor(apt.status),
-    borderColor: getStatusColor(apt.status),
-    extendedProps: {
-      clientId: apt.client_id,
-      status: apt.status,
-      title: apt.title,
-      location: apt.location,
-      description: apt.description,
-    },
-    classNames: [`session-${apt.status}`],
-  }))
+      : 'Sin cliente'
+    const phone = apt.client?.phone ? ` • ${apt.client.phone}` : ''
+    const sessionType = apt.title || 'Sesión'
+    const location = apt.location ? ` • ${apt.location}` : ''
+
+    return {
+      id: apt.id,
+      title: `${clientName}${phone}\n${sessionType}${location}`,
+      start: apt.start_time,
+      end: apt.end_time,
+      backgroundColor: getStatusColor(apt.status),
+      borderColor: getStatusColor(apt.status),
+      extendedProps: {
+        clientId: apt.client_id,
+        status: apt.status,
+        title: apt.title,
+        location: apt.location,
+        description: apt.description,
+      },
+      classNames: [`session-${apt.status}`],
+    }
+  })
 
   const handleSave = async (data: any) => {
     if (!user) {
@@ -238,6 +246,7 @@ export function CalendarShell({ workspaceId }: CalendarShellProps) {
           }}
           onSave={handleSave}
           onDelete={sheetMode === 'edit' ? handleDelete : undefined}
+          onStatusUpdate={refetch}
         />
       )}
     </div>
