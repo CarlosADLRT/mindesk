@@ -176,6 +176,24 @@ export async function updateAppointment(
 }
 
 /**
+ * Update appointment status with optional metadata
+ */
+export async function updateAppointmentStatus(
+  appointmentId: string,
+  status: string,
+  metadata?: { cancellationReason?: string }
+) {
+  const updates: Record<string, unknown> = { status }
+
+  if (status === 'canceled' && metadata?.cancellationReason) {
+    updates.cancellation_reason = metadata.cancellationReason
+    updates.canceled_at = new Date().toISOString()
+  }
+
+  return updateAppointment(appointmentId, updates)
+}
+
+/**
  * Cancel an appointment
  */
 export async function cancelAppointment(

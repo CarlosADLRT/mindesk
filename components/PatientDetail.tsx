@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { COP_CURRENCY } from '../constants';
+import { calculateRate } from '../lib/pricing';
 import { ArrowLeft, Plus, FileText, Save, Clock, Package as PackageIcon, Loader, Edit } from 'lucide-react';
 import { getAppointmentsByDateRange, saveSessionNote } from '../lib/api/appointments';
 import { EditClientModal } from './EditClientModal';
@@ -188,6 +189,18 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
                           <span className="font-medium text-slate-900">{client.gender}</span>
                        </div>
                      )}
+                     {client.marital_status && (
+                       <div className="flex flex-col">
+                          <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Estado Civil</span>
+                          <span className="font-medium text-slate-900 capitalize">{client.marital_status.replace('_', ' ')}</span>
+                       </div>
+                     )}
+                     {client.nationality && (
+                       <div className="flex flex-col">
+                          <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Nacionalidad</span>
+                          <span className="font-medium text-slate-900">{client.nationality}</span>
+                       </div>
+                     )}
                  </div>
              </div>
 
@@ -235,6 +248,76 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
                          <div className="flex flex-col">
                             <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Teléfono</span>
                             <span className="font-medium text-slate-900">{client.emergency_contact_phone}</span>
+                         </div>
+                       )}
+                   </div>
+               </div>
+             )}
+
+             {(client.previous_diagnosis || client.pharmacological_treatment || client.initial_consultation_reason || client.previous_psychology_assistance) && (
+               <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-soft space-y-6">
+                   <h3 className="text-lg font-bold text-slate-900 border-b border-slate-50 pb-4">Información Clínica</h3>
+                   <div className="space-y-4 text-slate-600">
+                       {client.previous_diagnosis && (
+                         <div className="flex flex-col">
+                            <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Diagnóstico Previo</span>
+                            <span className="font-medium text-slate-900 whitespace-pre-wrap">{client.previous_diagnosis}</span>
+                         </div>
+                       )}
+                       {client.pharmacological_treatment && (
+                         <div className="flex flex-col">
+                            <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Tratamiento Farmacológico</span>
+                            <span className="font-medium text-slate-900 whitespace-pre-wrap">{client.pharmacological_treatment}</span>
+                         </div>
+                       )}
+                       {client.initial_consultation_reason && (
+                         <div className="flex flex-col">
+                            <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Motivo de Consulta Inicial</span>
+                            <span className="font-medium text-slate-900 whitespace-pre-wrap">{client.initial_consultation_reason}</span>
+                         </div>
+                       )}
+                       {client.previous_psychology_assistance && (
+                         <div className="flex flex-col">
+                            <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Asistencia Previa por Psicología</span>
+                            <span className="font-medium text-slate-900 whitespace-pre-wrap">{client.previous_psychology_assistance}</span>
+                         </div>
+                       )}
+                   </div>
+               </div>
+             )}
+
+             {(client.care_modality || client.session_type || client.session_frequency || client.patient_status) && (
+               <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-soft space-y-6">
+                   <h3 className="text-lg font-bold text-slate-900 border-b border-slate-50 pb-4">Modalidad y Tarifa</h3>
+                   <div className="space-y-4 text-slate-600">
+                       {client.care_modality && (
+                         <div className="flex flex-col">
+                            <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Modalidad de Atención</span>
+                            <span className="font-medium text-slate-900 capitalize">{client.care_modality}</span>
+                         </div>
+                       )}
+                       {client.session_type && (
+                         <div className="flex flex-col">
+                            <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Tipo de Sesión</span>
+                            <span className="font-medium text-slate-900 capitalize">{client.session_type.replace('_', ' / ')}</span>
+                         </div>
+                       )}
+                       {client.session_frequency && (
+                         <div className="flex flex-col">
+                            <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Regularidad</span>
+                            <span className="font-medium text-slate-900 capitalize">{client.session_frequency}</span>
+                         </div>
+                       )}
+                       {client.patient_status && (
+                         <div className="flex flex-col">
+                            <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Estado del Paciente</span>
+                            <span className="font-medium text-slate-900 capitalize">{client.patient_status.replace('_', ' ')}</span>
+                         </div>
+                       )}
+                       {client.default_rate && (
+                         <div className="flex flex-col">
+                            <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Tarifa</span>
+                            <span className="font-medium text-slate-900">{COP_CURRENCY.format(client.default_rate)}{client.surcharge_schedule ? ' (incluye recargo)' : ''}</span>
                          </div>
                        )}
                    </div>
