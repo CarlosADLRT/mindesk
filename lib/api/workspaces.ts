@@ -199,6 +199,59 @@ export async function removeWorkspaceMember(
 }
 
 /**
+ * Get workspace pricing from settings
+ */
+export async function getWorkspacePricing(workspaceId: string) {
+  const { data, error } = await supabase
+    .from('workspaces')
+    .select('settings')
+    .eq('id', workspaceId)
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return (data?.settings as any)?.pricing ?? null
+}
+
+/**
+ * Update workspace pricing in settings
+ */
+export async function updateWorkspacePricing(
+  workspaceId: string,
+  pricing: { rate_matrix: Record<string, Record<string, number>>; surcharge_amount: number }
+) {
+  // First get current settings to merge
+  const { data: current } = await supabase
+    .from('workspaces')
+    .select('settings')
+    .eq('id', workspaceId)
+    .single()
+
+  const currentSettings = (current?.settings as Record<string, any>) || {}
+
+  const { data, error } = await supabase
+    .from('workspaces')
+    // @ts-ignore - Supabase generated types issue with update
+    .update({
+      settings: {
+        ...currentSettings,
+        pricing,
+      },
+    })
+    .eq('id', workspaceId)
+    .select()
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+/**
  * Update a workspace member's role
  */
 export async function updateWorkspaceMemberRole(

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { COP_CURRENCY } from '../constants';
-import { calculateRate } from '../lib/pricing';
 import { ArrowLeft, Plus, FileText, Save, Clock, Package as PackageIcon, Loader, Edit } from 'lucide-react';
 import { getAppointmentsByDateRange, saveSessionNote } from '../lib/api/appointments';
 import { EditClientModal } from './EditClientModal';

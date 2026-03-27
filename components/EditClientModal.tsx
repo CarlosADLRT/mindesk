@@ -3,10 +3,11 @@
  * Form for editing existing client information
  */
 
-import { useState, FormEvent, useMemo } from 'react'
+import { useState, useEffect, FormEvent, useMemo } from 'react'
 import { X } from 'lucide-react'
 import { updateClient } from '../lib/api/clients'
-import { calculateRate } from '../lib/pricing'
+import { getWorkspacePricing } from '../lib/api/workspaces'
+import { calculateRate, DEFAULT_PRICING, type WorkspacePricing } from '../lib/pricing'
 import { COP_CURRENCY } from '../constants'
 import type { Client } from '../lib/supabase'
 
@@ -19,6 +20,13 @@ interface EditClientModalProps {
 export function EditClientModal({ client, onClose, onSuccess }: EditClientModalProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pricing, setPricing] = useState<WorkspacePricing>(DEFAULT_PRICING)
+
+  useEffect(() => {
+    getWorkspacePricing(client.workspace_id).then((p) => {
+      if (p) setPricing(p)
+    }).catch(() => {})
+  }, [client.workspace_id])
 
   const [formData, setFormData] = useState({
     first_name: client.first_name || '',
@@ -39,8 +47,8 @@ export function EditClientModal({ client, onClose, onSuccess }: EditClientModalP
   })
 
   const computedRate = useMemo(
-    () => calculateRate(formData.care_modality, formData.session_type, formData.surcharge_schedule),
-    [formData.care_modality, formData.session_type, formData.surcharge_schedule]
+    () => calculateRate(formData.care_modality, formData.session_type, formData.surcharge_schedule, pricing),
+    [formData.care_modality, formData.session_type, formData.surcharge_schedule, pricing]
   )
 
   const computedAge = useMemo(() => {

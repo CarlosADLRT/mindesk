@@ -3,10 +3,11 @@
  * Form for adding new clients to the database
  */
 
-import { useState, FormEvent, useMemo } from 'react'
+import { useState, useEffect, FormEvent, useMemo } from 'react'
 import { X } from 'lucide-react'
 import { createClient } from '../lib/api/clients'
-import { calculateRate } from '../lib/pricing'
+import { getWorkspacePricing } from '../lib/api/workspaces'
+import { calculateRate, DEFAULT_PRICING, type WorkspacePricing } from '../lib/pricing'
 import { COP_CURRENCY } from '../constants'
 import type { TablesInsert } from '../lib/supabase'
 
@@ -19,6 +20,13 @@ interface CreateClientModalProps {
 export function CreateClientModal({ workspaceId, onClose, onSuccess }: CreateClientModalProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pricing, setPricing] = useState<WorkspacePricing>(DEFAULT_PRICING)
+
+  useEffect(() => {
+    getWorkspacePricing(workspaceId).then((p) => {
+      if (p) setPricing(p)
+    }).catch(() => {})
+  }, [workspaceId])
 
   const [formData, setFormData] = useState({
     first_name: '',
@@ -39,8 +47,8 @@ export function CreateClientModal({ workspaceId, onClose, onSuccess }: CreateCli
   })
 
   const computedRate = useMemo(
-    () => calculateRate(formData.care_modality, formData.session_type, formData.surcharge_schedule),
-    [formData.care_modality, formData.session_type, formData.surcharge_schedule]
+    () => calculateRate(formData.care_modality, formData.session_type, formData.surcharge_schedule, pricing),
+    [formData.care_modality, formData.session_type, formData.surcharge_schedule, pricing]
   )
 
   const computedAge = useMemo(() => {
